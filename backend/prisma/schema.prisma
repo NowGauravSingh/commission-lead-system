@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LeadStatus {
+  OPEN
+  CLOSED
+}
+
+enum CommissionType {
+  COMPANY
+  AGENT
+  MANAGER
+  MANAGERS_MANAGER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+
+  managerId String?
+  manager   User?    @relation("UserHierarchy", fields: [managerId], references: [id])
+  reports   User[]   @relation("UserHierarchy")
+
+  leads       Lead[]
+  commissions CommissionLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([managerId])
+}
+
+model Lead {
+  id      String     @id @default(uuid())
+  title   String
+  revenue Decimal    @db.Decimal(12, 2)
+
+  status LeadStatus @default(OPEN)
+
+  assignedToId String?
+  assignedTo   User? @relation(fields: [assignedToId], references: [id])
+
+  commissions CommissionLedger[]
+
+  createdAt DateTime @default(now())
+  closedAt  DateTime?
+
+  @@index([assignedToId])
+  @@index([status])
+}
+
+model CommissionLedger {
+  id String @id @default(uuid())
+
+  leadId String
+  userId String?
+
+  type   CommissionType
+  amount Decimal         @db.Decimal(12, 2)
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  // Prevent duplicate commission entries for the same lead/type
+  @@unique([leadId, type])
+
+  @@index([leadId])
+  @@index([userId])
+}
